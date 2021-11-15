@@ -6,6 +6,7 @@ services:
     image: traefik-dynamic-blocklist
     build: .
 
+  # https://hub.docker.com/r/mendhak/http-https-echo
   echo:
     image: mendhak/http-https-echo:21
 
