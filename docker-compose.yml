@@ -1,0 +1,41 @@
+version: "3.7"
+
+services:
+
+  blocklist:
+    image: traefik-dynamic-blocklist
+    build: .
+
+  echo:
+    image: mendhak/http-https-echo:21
+
+    labels:
+      traefik.enable: true
+      traefik.http.services.echo.loadbalancer.server.port: 8080
+      traefik.http.middlewares.blocklist.forwardauth.address: 'http://blocklist:8000/check'
+      traefik.http.middlewares.blocklist.forwardauth.trustForwardHeader: 'true'
+      #traefik.http.routers.echo.entrypoints: "web"
+      traefik.http.routers.echo.middlewares: "blocklist"
+      traefik.http.routers.echo.rule: "Host(`echo.localtest.me`)"
+
+  traefik:
+    image: "traefik:v2.5"
+    command:
+      # - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.traefik.address=:8080"
+    labels:
+      traefik.enable: true
+      traefik.http.routers.traefik.service: api@internal
+      traefik.http.routers.traefik.entrypoints: traefik
+    ports:
+      - "8080:8080"
+      - "80:80"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
