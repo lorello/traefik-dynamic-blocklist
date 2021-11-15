@@ -19,9 +19,13 @@ import (
 type ip struct {
 	Description string `json:"Description"`
 	Ip          string `json:"Ip"`
+	// TODO: Expire time
 }
 
+// The structure that will host the blocked IPs
 var ips = map[string]ip{
+
+	// Todo: remove this hardcoded value, added for test
 	"192.168.1.1": {
 		Description: "Revelaed from loki logs @ 2010291029120",
 		Ip:          "192.168.178.1",
@@ -29,9 +33,10 @@ var ips = map[string]ip{
 }
 
 func homeLink(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome home!")
+	fmt.Fprintf(w, "This service should not be call directly!")
 }
 
+// Add blocked IPs with an API call
 func createIp(w http.ResponseWriter, r *http.Request) {
 	var newIp ip
 	// Convert r.Body into a readable formart
@@ -51,19 +56,22 @@ func createIp(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(newIp)
 }
 
+// This api should receive calls from traefik
+// ForwardAuth Middleware:
+// https://doc.traefik.io/traefik/v2.5/middlewares/http/forwardauth/
+// Check if an IP should be allowed or not
+// and at the same time check if the path requested
+// could be a symptom of an attack
 func isAllowed(w http.ResponseWriter, r *http.Request) {
 
+	// get request data from Traefik
 	originIp := r.RemoteAddr
 	xforward := r.Header.Get("X-Forwarded-For")
 	if xforward != "" {
 		originIp = xforward
 	}
-
 	originHost := r.Header.Get("X-Forwarded-Host")
 	originUri := r.Header.Get("X-Forwarded-Uri")
-
-	//log.Println("IP: ", ip)
-	//log.Println("X-Forwarded-For: ", xforward)
 
         var result bool = false
         for k, _ := range ips {
@@ -87,19 +95,6 @@ func isAllowed(w http.ResponseWriter, r *http.Request) {
 
 
 }
-
-//func getBlacklistItem(w http.ResponseWriter, r *http.Request) {
-	// Get the ID from the url
-//	ipID := mux.Vars(r)["ip"]
-
-	// Get the details from an existing IP
-	// Use the blank identifier to avoid creating a value that will not be used
-//	for _, singleIP := range ips {
-//		if singleIP.ID == ipID {
-//			json.NewEncoder(w).Encode(singleIP)
-//		}
-//	}
-//}
 
 func getBlacklist(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ips)
@@ -161,6 +156,7 @@ func main() {
 	flag.IntVar(&port, "port", 8000, "HTTP server port")
 	flag.Parse()
 
+	// Mux lib: https://github.com/gorilla/mux
 	router := mux.NewRouter().StrictSlash(true)
 
 	router.Use(loggingMiddleware)
@@ -195,6 +191,7 @@ func main() {
 	//	log.Println(len(ips))
 	//}
 
+	// Graceful shutdown
 	c := make(chan os.Signal, 1)
 	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
 	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
