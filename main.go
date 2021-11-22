@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"time"
 )
 
@@ -21,6 +22,8 @@ type ip struct {
 	Ip          string `json:"Ip"`
 	// TODO: Expire time
 }
+
+
 
 // The structure that will host the blocked IPs
 var ips = map[string]ip{
@@ -31,6 +34,9 @@ var ips = map[string]ip{
 		Ip:          "192.168.178.1",
 	},
 }
+
+var suspectsLimit int = 5
+var suspected = map[string]int{}
 
 func homeLink(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "This service should not be call directly!")
@@ -74,68 +80,56 @@ func isAllowed(w http.ResponseWriter, r *http.Request) {
 	originUri := r.Header.Get("X-Forwarded-Uri")
 
         var result bool = false
-        for k, _ := range ips {
-		if k == originHost {
-			result = true
-			break
-		}
-	}
+
+	val, result := ips[originHost]
 
 	if result {
-		log.Printf("%d. Blocked request on %s%s from %s", counter, originHost, originUri, originIp)
+		log.Printf("%d. Blocked request on %s%s from %s (%s)", counter, originHost, originUri, originIp, val.Description)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	} else {
 		log.Printf("%d. Allowed request on %s%s from %s", counter, originHost, originUri, originIp)
 		// check if host is attacking
-		if originUri == "/phpMyAdmin" {
-			log.Printf("%d. Attack suspect on %s%s from %s", counter, originHost, originUri, originIp)
+		// TODO: other checks to implement
+		// cgi-bin, wp-admin
+		// Good source of check 
+		// https://github.com/PHPIDS/PHPIDS/blob/master/lib/IDS/default_filter.xml
+		// https://github.com/jensvoid/lorg
+		// All this thread is enough: https://security.stackexchange.com/questions/200427/what-are-the-common-features-to-identify-xss-attack-from-apache-log-file
+		// all these check should become async, so put it in a goroutine
+		listOfPatterns := []string{"wp-admin", "cgi-bin", "phpMyAdmin"}
+		for _, regex := range listOfPatterns {
+			didMatched, err := regexp.MatchString(regex, originUri)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if didMatched == true {
+				_, result2 := suspected[originHost]
+				if result2 {
+					suspected[originHost]+=1
+				} else {
+					suspected[originHost]=1
+				}
+				if suspected[originHost] >= suspectsLimit {
+
+					newIp := ip{
+						Description: "Added after 5 suspects",
+						Ip:          originHost,
+					}
+					ips[newIp.Ip] = newIp
+
+					log.Printf("%d. Maximum suspects reached on %s%s from %s", counter, originHost, originUri, originIp)
+				} else {
+					log.Printf("%d. Attack suspect on %s%s from %s", counter, originHost, originUri, originIp)
+				}
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 	}
-
-
 }
 
 func getBlacklist(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ips)
 }
-
-/*
-func updateBlacklistItem(w http.ResponseWriter, r *http.Request) {
-	// Get the ID from the url
-	ipID := mux.Vars(r)["id"]
-	var updatedEvent ip
-	// Convert r.Body into a readable formart
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "Kindly enter data with the IP title and description only in order to update")
-	}
-
-	json.Unmarshal(reqBody, &updatedEvent)
-
-	for i, singleIP := range ips {
-		if singleIP.ID == ipID {
-			singleIP.Description = updatedEvent.Description
-			ips[i] = singleIP
-			json.NewEncoder(w).Encode(singleIP)
-		}
-	}
-}
-*/
-
-/* func deleteBlacklistItem(w http.ResponseWriter, r *http.Request) {
-	// Get the ID from the url
-	ipID := mux.Vars(r)["id"]
-
-	// Get the details from an existing IP
-	// Use the blank identifier to avoid creating a value that will not be used
-	for i, singleIP := range ips {
-		if singleIP.ID == ipID {
-			ips = append(ips[:i], ips[i+1:]...)
-			fmt.Fprintf(w, "The IP with ID %v has been deleted successfully", ipID)
-		}
-	}
-} */
 
 var counter = 0
 
@@ -165,9 +159,6 @@ func main() {
 	router.HandleFunc("/check", isAllowed).Methods("GET")
 	router.HandleFunc("/blacklist", createIp).Methods("POST")
 	//router.HandleFunc("/blacklist", getBlacklist).Methods("GET")
-	//router.HandleFunc("/blacklist/{id}", getBlacklistItem).Methods("GET")
-	//router.HandleFunc("/blacklist/{id}", updateBlacklistItem).Methods("PATCH")
-	//router.HandleFunc("/blacklist/{id}", deleteBlacklistItem).Methods("DELETE")
 
 	bindAddr := fmt.Sprint("0.0.0.0:", port)
 	srv := &http.Server{
