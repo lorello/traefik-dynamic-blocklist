@@ -1,5 +1,8 @@
 # Dynamic IPs Blacklist for Traefik 
 
+[![pipeline status](https://gitlab.com/opencontent/traefik-dynamic-blocklist/badges/main/pipeline.svg)](https://gitlab.com/opencontent/traefik-dynamic-blocklist/-/commits/main)
+
+
 This small software implements the possibility to block access to all the services
 behind your Traefik service.
 
