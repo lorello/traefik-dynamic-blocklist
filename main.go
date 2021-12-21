@@ -96,7 +96,7 @@ func isAllowed(w http.ResponseWriter, r *http.Request) {
 		// https://github.com/jensvoid/lorg
 		// All this thread is enough: https://security.stackexchange.com/questions/200427/what-are-the-common-features-to-identify-xss-attack-from-apache-log-file
 		// all these check should become async, so put it in a goroutine
-		listOfPatterns := []string{"wp-admin", "cgi-bin", "phpMyAdmin"}
+		listOfPatterns := []string{"wp-admin", "cgi-bin", "phpMyAdmin", "jndi"}
 		for _, regex := range listOfPatterns {
 			didMatched, err := regexp.MatchString(regex, originUri)
 			if err != nil {
