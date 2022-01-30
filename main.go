@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"regexp"
 	"time"
+	"viper"
 )
 
 type ip struct {
@@ -87,7 +88,8 @@ func isAllowed(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%d. Blocked request on %s%s from %s (%s)", counter, originHost, originUri, originIp, val.Description)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 	} else {
-		log.Printf("%d. Allowed request on %s%s from %s", counter, originHost, originUri, originIp)
+		// log.Printf("%d. Allowed request on %s%s from %s", counter, originHost, originUri, originIp)
+
 		// check if host is attacking
 		// TODO: other checks to implement
 		// cgi-bin, wp-admin
@@ -149,6 +151,10 @@ func main() {
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
 	flag.IntVar(&port, "port", 8000, "HTTP server port")
 	flag.Parse()
+
+
+	viper.SetDefault("myListOfPatterns", [1]string{"cgi-bin"})
+	viper.BindEnv("myListOfPatterns")
 
 	// Mux lib: https://github.com/gorilla/mux
 	router := mux.NewRouter().StrictSlash(true)
